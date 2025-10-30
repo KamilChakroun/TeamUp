@@ -11,6 +11,9 @@ from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.contrib.auth.decorators import login_required
 from .models import User, UserProfile, EmailVerificationToken
+
+from apps.feedback.models import ParticipantFeedback, SessionFeedback
+
 import json
 import uuid
 import re
@@ -560,6 +563,17 @@ def profile_view(request, username):
     # Get session statistics
     sessions_created = Session.objects.filter(creator=profile_user).count()
     sessions_joined = Session.objects.filter(invitees=profile_user).count()
+
+    user = request.user
+
+    participant_feedbacks = ParticipantFeedback.objects.filter(
+        target=user
+    ).select_related("author", "session")
+    session_feedbacks = SessionFeedback.objects.filter(user=user).select_related(
+        "session"
+    )
+    user_badges = user.badges.select_related("badge").all()
+
     
     context = {
         'profile_user': profile_user,
@@ -568,6 +582,9 @@ def profile_view(request, username):
         'sports_list': sports_list,
         'sessions_created': sessions_created,
         'sessions_joined': sessions_joined,
+        "participant_feedbacks": participant_feedbacks,
+        "session_feedbacks": session_feedbacks,
+        "user_badges": user_badges,  # ⭐ Pass to template
     }
     
     return render(request, 'users/profile.html', context)

@@ -189,7 +189,8 @@ def user_feedback_summary(request):
     session_feedbacks = SessionFeedback.objects.filter(user=user).select_related(
         "session"
     )
-    user_badges = user.badges.select_related("badge")  # ⭐ Add this
+    user_badges = user.badges.select_related("badge").all()
+
 
     return render(
         request,
