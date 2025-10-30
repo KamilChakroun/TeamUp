@@ -1,0 +1,488 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="wrapper">
+  <div id="content-page" class="content-page">
+    <div class="container">
+      <div class="row">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-body chat-page p-0">
+              <div class="chat-data-block">
+                <div class="row">
+                  <!-- Sidebar des participants -->
+                  <div class="col-lg-3 chat-data-left scroller border-end">
+                    <div class="p-3">
+                      <h5 class="mb-3">{{ session.get_sport_type_display }}</h5>
+                      <p class="text-muted small">
+                        <i class="ri-map-pin-line"></i> {{ session.location }}<br>
+                        <i class="ri-calendar-line"></i> {{ session.start_datetime|date:"d/m/Y H:i" }}
+                      </p>
+                      
+                      <hr>
+                      
+                      <h6 class="mb-3">Participants ({{ participants|length }})</h6>
+                      <ul class="list-unstyled">
+                        {% for item in participants %}
+                        <li class="mb-3 d-flex align-items-center justify-content-between" id="participant-{{ item.id }}">
+                          <div class="d-flex align-items-center">
+                            <div class="avatar me-2">
+                              {% if item.user.profile.avatar %}
+                              <img src="{{ item.user.profile.avatar.url }}" alt="{{ item.username }}" class="avatar-35 rounded-circle">
+                              {% else %}
+                              <div class="avatar-35 rounded-circle bg-primary text-white d-flex align-items-center justify-content-center">
+                                {{ item.username|first|upper }}
+                              </div>
+                              {% endif %}
+                            </div>
+                            <div>
+                              <small class="d-block fw-bold">
+                                {{ item.username }}
+                                {% if item.user == session.creator %}
+                                <span class="badge bg-primary">Créateur</span>
+                                {% endif %}
+                                {% if item.user == request.user %}
+                                <span class="badge bg-info">Vous</span>
+                                {% endif %}
+                                {% if item.is_blocked %}
+                                <span class="badge bg-danger">Bloqué</span>
+                                {% endif %}
+                              </small>
+                            </div>
+                          </div>
+                          
+                          <!-- Bouton Block/Unblock (seulement si ce n'est pas l'utilisateur actuel) -->
+                          {% if item.user != request.user %}
+                          <div>
+                            {% if item.is_blocked %}
+                            <button class="btn btn-sm btn-success unblock-user-btn" 
+                                    data-user-id="{{ item.id }}" 
+                                    data-username="{{ item.username }}"
+                                    title="Débloquer cet utilisateur">
+                              <i class="ri-check-line"></i>
+                            </button>
+                            {% else %}
+                            <button class="btn btn-sm btn-danger block-user-btn" 
+                                    data-user-id="{{ item.id }}" 
+                                    data-username="{{ item.username }}"
+                                    title="Bloquer cet utilisateur">
+                              <i class="ri-forbid-line"></i>
+                            </button>
+                            {% endif %}
+                          </div>
+                          {% endif %}
+                        </li>
+                        {% endfor %}
+                      </ul>
+                      
+                      <hr>
+                      
+                      <a href="{% url 'sessions:detail' session.id %}" class="btn btn-outline-primary btn-sm w-100">
+                        <i class="ri-arrow-left-line"></i> Retour à la session
+                      </a>
+                    </div>
+                  </div>
+
+                  <!-- Zone de chat -->
+                  <div class="col-lg-9 chat-data p-0">
+                    <!-- En-tête -->
+                    <div class="chat-head">
+                      <header class="d-flex justify-content-between align-items-center bg-white p-3 border-bottom">
+                        <div class="d-flex align-items-center">
+                          <i class="ri-message-3-line text-primary me-2 h4 mb-0"></i>
+                          <div>
+                            <h5 class="mb-0">Chat - {{ session.get_sport_type_display }}</h5>
+                            <small class="text-muted">{{ participants|length }} participant(s)</small>
+                          </div>
+                        </div>
+                      </header>
+                    </div>
+
+                    <!-- Contenu des messages -->
+                    <div class="chat-content scroller" id="chat-content" style="height: 500px; overflow-y: auto;">
+                      <div id="messages-container">
+                        {% for message in messages %}
+                        {% if message.sender.id not in blocked_user_ids %}
+                        <div class="chat {% if message.sender == request.user %}chat-left{% else %}d-flex other-user{% endif %} message-item" 
+                             data-message-id="{{ message.id }}" 
+                             data-sender-id="{{ message.sender.id }}">
+                          <div class="chat-user">
+                            {% if message.sender.profile.avatar %}
+                            <img src="{{ message.sender.profile.avatar.url }}" alt="{{ message.sender.username }}" class="avatar-35 rounded-circle">
+                            {% else %}
+                            <div class="avatar-35 rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center">
+                              {{ message.sender.username|first|upper }}
+                            </div>
+                            {% endif %}
+                            <span class="chat-time mt-1">{{ message.created_at|date:"H:i" }}</span>
+                          </div>
+                          <div class="chat-detail">
+                            <div class="chat-message position-relative">
+                              <p class="mb-0">{{ message.content }}</p>
+                              
+                              <!-- Bouton supprimer (seulement pour ses propres messages) -->
+                              {% if message.sender == request.user %}
+                              <button class="btn btn-sm btn-link text-danger delete-message-btn position-absolute" 
+                                      style="top: 0; right: 0; opacity: 0; transition: opacity 0.2s;"
+                                      data-message-id="{{ message.id }}"
+                                      title="Supprimer ce message">
+                                <i class="ri-delete-bin-line"></i>
+                              </button>
+                              {% endif %}
+                            </div>
+                          </div>
+                        </div>
+                        {% endif %}
+                        {% empty %}
+                        <div class="text-center text-muted py-5" id="no-messages">
+                          <i class="ri-chat-3-line" style="font-size: 3rem;"></i>
+                          <p>Aucun message pour le moment. Soyez le premier à écrire !</p>
+                        </div>
+                        {% endfor %}
+                      </div>
+                    </div>
+
+                    <!-- Pied de page - Formulaire d'envoi -->
+                    <div class="chat-footer p-3 bg-white border-top">
+                      <form id="message-form" class="d-flex align-items-center">
+                        {% csrf_token %}
+                        <input
+                          type="text"
+                          id="message-input"
+                          class="form-control me-3"
+                          placeholder="Tapez votre message..."
+                          autocomplete="off"
+                          required
+                        />
+                        <button type="submit" class="btn btn-primary d-flex align-items-center px-3">
+                          <i class="ri-send-plane-fill"></i>
+                          <span class="d-none d-lg-block ms-1">Envoyer</span>
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+/* Afficher le bouton delete au hover */
+.chat-message:hover .delete-message-btn {
+    opacity: 1 !important;
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const messageForm = document.getElementById('message-form');
+    const messageInput = document.getElementById('message-input');
+    const messagesContainer = document.getElementById('messages-container');
+    const chatContent = document.getElementById('chat-content');
+    const noMessages = document.getElementById('no-messages');
+    const currentUserId = {{ request.user.id }};
+    
+    let lastMessageId = {{ messages.last.id|default:0 }};
+    let blockedUserIds = {{ blocked_user_ids|safe }};
+    
+    console.log('Current User ID:', currentUserId);
+    console.log('Blocked user IDs:', blockedUserIds);
+    
+    // Faire défiler vers le bas au chargement
+    chatContent.scrollTop = chatContent.scrollHeight;
+    
+    // Envoyer un message
+    messageForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const content = messageInput.value.trim();
+        
+        if (!content) return;
+        
+        const submitBtn = messageForm.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        
+        fetch("{% url 'sessions:send_message' session.id %}", {
+            method: 'POST',
+            headers: {
+                'X-CSRFToken': '{{ csrf_token }}',
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `content=${encodeURIComponent(content)}`
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                alert(data.error);
+            } else {
+                addMessageToUI(data);
+                messageInput.value = '';
+                lastMessageId = data.id;
+                
+                if (noMessages) {
+                    noMessages.remove();
+                }
+            }
+        })
+        .catch(error => {
+            console.error('Erreur:', error);
+            alert('Erreur lors de l\'envoi du message');
+        })
+        .finally(() => {
+            submitBtn.disabled = false;
+            messageInput.focus();
+        });
+    });
+    
+    // Polling pour les nouveaux messages
+    setInterval(function() {
+        fetch(`{% url 'sessions:get_messages' session.id %}?last_id=${lastMessageId}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.messages && data.messages.length > 0) {
+                data.messages.forEach(msg => {
+                    // Ne pas afficher les messages des utilisateurs bloqués
+                    if (!blockedUserIds.includes(msg.sender_id)) {
+                        addMessageToUI(msg);
+                        lastMessageId = msg.id;
+                    }
+                });
+                
+                if (noMessages) {
+                    noMessages.remove();
+                }
+            }
+        })
+        .catch(error => console.error('Erreur polling:', error));
+    }, 3000);
+    
+    // Attacher les événements pour les boutons existants
+    attachDeleteEvents();
+    attachBlockEvents();
+    attachUnblockEvents();
+    
+    // Supprimer un message
+    function attachDeleteEvents() {
+        document.querySelectorAll('.delete-message-btn').forEach(btn => {
+            btn.onclick = function(e) {
+                e.preventDefault();
+                const messageId = this.dataset.messageId;
+                
+                if (!confirm('Voulez-vous vraiment supprimer ce message ?')) return;
+                
+                fetch(`{% url 'sessions:delete_message' 0 %}`.replace('0', messageId), {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        const msgDiv = document.querySelector(`[data-message-id="${messageId}"]`);
+                        if (msgDiv) {
+                            msgDiv.style.opacity = '0.3';
+                            const msgContent = msgDiv.querySelector('.chat-message p');
+                            if (msgContent) {
+                                msgContent.innerHTML = '<em class="text-muted">Message supprimé</em>';
+                            }
+                            const deleteBtn = msgDiv.querySelector('.delete-message-btn');
+                            if (deleteBtn) deleteBtn.remove();
+                            
+                            setTimeout(() => msgDiv.remove(), 2000);
+                        }
+                    } else {
+                        alert(data.message || 'Erreur lors de la suppression');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur:', error);
+                    alert('Erreur lors de la suppression');
+                });
+            };
+        });
+    }
+    
+    // Bloquer un utilisateur
+    function attachBlockEvents() {
+        document.querySelectorAll('.block-user-btn').forEach(btn => {
+            btn.onclick = function(e) {
+                e.preventDefault();
+                const userId = parseInt(this.dataset.userId);
+                const username = this.dataset.username;
+                
+                console.log('Blocking user:', userId, username);
+                
+                // Vérifier qu'on ne bloque pas soi-même
+                if (userId === currentUserId) {
+                    alert('Vous ne pouvez pas vous bloquer vous-même');
+                    return;
+                }
+                
+                if (!confirm(`Bloquer ${username} ? Vous ne verrez plus ses messages.`)) return;
+                
+                fetch(`{% url 'sessions:block_user' 0 %}`.replace('0', userId), {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Block response:', data);
+                    if (data.success) {
+                        // Mettre à jour l'interface
+                        updateParticipantButton(userId, true, username);
+                        hideUserMessages(userId);
+                        blockedUserIds.push(userId);
+                        alert(data.message);
+                    } else {
+                        alert(data.message || 'Erreur lors du blocage');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur:', error);
+                    alert('Erreur lors du blocage');
+                });
+            };
+        });
+    }
+    
+    // Débloquer un utilisateur
+    function attachUnblockEvents() {
+        document.querySelectorAll('.unblock-user-btn').forEach(btn => {
+            btn.onclick = function(e) {
+                e.preventDefault();
+                const userId = parseInt(this.dataset.userId);
+                const username = this.dataset.username;
+                
+                console.log('Unblocking user:', userId, username);
+                
+                if (!confirm(`Débloquer ${username} ?`)) return;
+                
+                fetch(`{% url 'sessions:unblock_user' 0 %}`.replace('0', userId), {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Unblock response:', data);
+                    if (data.success) {
+                        alert(data.message + ' La page va se recharger.');
+                        location.reload();
+                    } else {
+                        alert(data.message || 'Erreur lors du déblocage');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur:', error);
+                    alert('Erreur lors du déblocage');
+                });
+            };
+        });
+    }
+    
+    // Mettre à jour le bouton Block/Unblock
+    function updateParticipantButton(userId, isBlocked, username) {
+        const participant = document.getElementById(`participant-${userId}`);
+        if (!participant) {
+            console.log('Participant not found:', userId);
+            return;
+        }
+        
+        const buttonContainer = participant.querySelector('div:last-child');
+        
+        if (isBlocked) {
+            // Ajouter badge "Bloqué"
+            const nameDiv = participant.querySelector('.fw-bold');
+            if (nameDiv && !nameDiv.querySelector('.bg-danger')) {
+                nameDiv.innerHTML += ' <span class="badge bg-danger">Bloqué</span>';
+            }
+            
+            // Changer le bouton
+            buttonContainer.innerHTML = `
+                <button class="btn btn-sm btn-success unblock-user-btn" 
+                        data-user-id="${userId}" 
+                        data-username="${escapeHtml(username)}"
+                        title="Débloquer cet utilisateur">
+                  <i class="ri-check-line"></i>
+                </button>
+            `;
+            
+            // Réattacher l'événement
+            attachUnblockEvents();
+        }
+    }
+    
+    // Masquer les messages d'un utilisateur
+    function hideUserMessages(userId) {
+        console.log('Hiding messages from user:', userId);
+        const messages = document.querySelectorAll(`[data-sender-id="${userId}"]`);
+        console.log('Found messages to hide:', messages.length);
+        messages.forEach(msg => {
+            msg.style.display = 'none';
+        });
+    }
+    
+    // Ajouter un message à l'interface
+    function addMessageToUI(message) {
+        // Ne pas afficher si l'utilisateur est bloqué
+        if (blockedUserIds.includes(message.sender_id)) {
+            console.log('Message from blocked user, skipping:', message.sender_id);
+            return;
+        }
+        
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `chat ${message.is_own ? 'chat-left' : 'd-flex other-user'} message-item`;
+        messageDiv.setAttribute('data-message-id', message.id);
+        messageDiv.setAttribute('data-sender-id', message.sender_id);
+        
+        const initial = message.sender_name ? message.sender_name.charAt(0).toUpperCase() : 'U';
+        
+        const deleteBtn = message.is_own ? `
+            <button class="btn btn-sm btn-link text-danger delete-message-btn position-absolute" 
+                    style="top: 0; right: 0; opacity: 0; transition: opacity 0.2s;"
+                    data-message-id="${message.id}"
+                    title="Supprimer ce message">
+              <i class="ri-delete-bin-line"></i>
+            </button>
+        ` : '';
+        
+        messageDiv.innerHTML = `
+            <div class="chat-user">
+                <div class="avatar-35 rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center">
+                    ${initial}
+                </div>
+                <span class="chat-time mt-1">${message.created_at}</span>
+            </div>
+            <div class="chat-detail">
+                <div class="chat-message position-relative">
+                    <p class="mb-0">${escapeHtml(message.content)}</p>
+                    ${deleteBtn}
+                </div>
+            </div>
+        `;
+        
+        messagesContainer.appendChild(messageDiv);
+        chatContent.scrollTop = chatContent.scrollHeight;
+        
+        // Attacher les événements aux nouveaux boutons
+        attachDeleteEvents();
+    }
+    
+    // Échapper le HTML
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+});
+</script>
+{% endblock %}
