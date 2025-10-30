@@ -75,11 +75,10 @@ def session_detail(request, pk):
     # Responses count (non-pending)
     responses_count = invitations.exclude(status='pending').count()
 
-    # AI visibility: creator OR accepted invitee
+    # AI visibility: creator OR any invitee (pending/accepted/refused/rescheduled)
     can_see_ai = (
         request.user.is_authenticated and
-        (request.user == session.creator or
-         (user_invitation and user_invitation.status == 'accepted'))
+        (request.user == session.creator or user_invitation is not None)
     )
 
     context = {
